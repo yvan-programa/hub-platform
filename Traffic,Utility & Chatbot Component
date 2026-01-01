@@ -1,0 +1,563 @@
+// ============================================
+// PART 4: TRAFFIC, UTILITIES & CHATBOT
+// ============================================
+
+// ========== pages/shopping/cart.tsx ==========
+import { useState, useEffect, FormEvent } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { shopping } from '../../lib/api';
+
+export default function CartPage() {
+  const router = useRouter();
+  const [cart, setCart] = useState<any[]>([]);
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    street: '', city: '', province: '', phone: ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadCart();
+  }, []);
+
+  const loadCart = () => {
+    const saved = JSON.parse(localStorage.getItem('cart') || '[]');
+    setCart(saved);
+  };
+
+  const updateQty = (pid: string, newQty: number) => {
+    const updated = cart.map(item => 
+      item.product_id === pid ? { ...item, quantity: Math.max(1, newQty) } : item
+    );
+    setCart(updated);
+    localStorage.setItem('cart', JSON.stringify(updated));
+  };
+
+  const removeItem = (pid: string) => {
+    const updated = cart.filter(item => item.product_id !== pid);
+    setCart(updated);
+    localStorage.setItem('cart', JSON.stringify(updated));
+  };
+
+  const getTotal = () => cart.reduce((sum, item) => sum + (item.price_cents * item.quantity), 0);
+
+  const handleCheckout = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!localStorage.getItem('token')) {
+      router.push('/auth/login');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await shopping.createOrder(cart, deliveryAddress);
+      localStorage.removeItem('cart');
+      router.push(`/shopping/orders/${data.id}`);
+    } catch (err) {
+      alert('Commande échouée');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (cart.length === 0) {
+    return (
+      <Layout>
+        <div className="container" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <div style={{ fontSize: '5rem', marginBottom: '2rem' }}>🛒</div>
+          <h1>Votre panier est vide</h1>
+          <p style={{ color: 'var(--muted)', marginTop: '1rem' }}>
+            Commencez vos achats pour ajouter des articles
+          </p>
+          <button onClick={() => router.push('/shopping')} style={{ marginTop: '2rem' }}>
+            Parcourir les produits
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>🛒 Panier</h1>
+          <p>{cart.length} article(s)</p>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+          <div>
+            {cart.map((item: any) => (
+              <div key={item.product_id} className="card" style={{ marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
+                {item.image_url && (
+                  <img src={item.image_url} alt={item.name} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
+                )}
+                
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ marginBottom: '0.5rem' }}>{item.name}</h3>
+                  <p style={{ color: 'var(--primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    {(item.price_cents / 100).toLocaleString()} BIF
+                  </p>
+                  
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <button onClick={() => updateQty(item.product_id, item.quantity - 1)} style={{ width: '30px', height: '30px', padding: '0' }}>-</button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => updateQty(item.product_id, item.quantity + 1)} style={{ width: '30px', height: '30px', padding: '0' }}>+</button>
+                    <button onClick={() => removeItem(item.product_id)} style={{ marginLeft: 'auto', background: 'var(--error)', padding: '0.5rem 1rem' }}>
+                      Retirer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="card" style={{ position: 'sticky', top: '6rem' }}>
+              <h3 style={{ marginBottom: '1.5rem' }}>Livraison</h3>
+              
+              <form onSubmit={handleCheckout}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Adresse</label>
+                  <input type="text" value={deliveryAddress.street} onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })} required />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Ville</label>
+                  <input type="text" value={deliveryAddress.city} onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })} required />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Province</label>
+                  <input type="text" value={deliveryAddress.province} onChange={(e) => setDeliveryAddress({ ...deliveryAddress, province: e.target.value })} required />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Téléphone</label>
+                  <input type="tel" value={deliveryAddress.phone} onChange={(e) => setDeliveryAddress({ ...deliveryAddress, phone: e.target.value })} required />
+                </div>
+
+                <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span>Sous-total</span>
+                    <span>{(getTotal() / 100).toLocaleString()} BIF</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span>Livraison</span>
+                    <span>Gratuit</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '2px solid var(--border)' }}>
+                    <span>Total</span>
+                    <span>{(getTotal() / 100).toLocaleString()} BIF</span>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={loading} style={{ width: '100%' }}>
+                  {loading ? '⏳ Traitement...' : '💳 Commander'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/traffic/index.tsx ==========
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
+import { traffic } from '../../lib/api';
+import { io, Socket } from 'socket.io-client';
+
+export default function TrafficPage() {
+  const [trafficData, setTrafficData] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTraffic();
+    loadIncidents();
+    
+    // WebSocket connection
+    const socket: Socket = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000', {
+      path: '/socket.io',
+      transports: ['websocket']
+    });
+
+    socket.on('connect', () => console.log('WebSocket connected'));
+    socket.on('traffic-update', (data) => setTrafficData(data));
+    socket.on('traffic-incident', (incident) => setIncidents(prev => [incident, ...prev]));
+
+    return () => { socket.disconnect(); };
+  }, []);
+
+  const loadTraffic = async () => {
+    try {
+      const { data } = await traffic.getLive();
+      setTrafficData(data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadIncidents = async () => {
+    try {
+      const { data } = await traffic.getIncidents();
+      setIncidents(data);
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: any = { clear: '#22c55e', moderate: '#eab308', heavy: '#f97316', blocked: '#ef4444' };
+    return colors[status] || '#6b7280';
+  };
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>🚗 Trafic en direct</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Conditions de circulation en temps réel
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#22c55e' }} />
+            <span>Mise à jour toutes les 30 secondes</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+          <div>
+            <h2>🚦 Trafic actuel</h2>
+            {loading ? (
+              <div>
+                {[1,2,3].map(i => (
+                  <div key={i} className="card" style={{ marginBottom: '1rem' }}>
+                    <div className="skeleton" style={{ height: '80px' }} />
+                  </div>
+                ))}
+              </div>
+            ) : trafficData.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+                <p>Aucune donnée disponible</p>
+              </div>
+            ) : (
+              <div style={{ marginTop: '1rem' }}>
+                {trafficData.map((item: any) => (
+                  <div key={item.id} className="card" style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h4>{item.road_name}</h4>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          Vitesse: {item.speed_kmh} km/h
+                        </p>
+                      </div>
+                      <div style={{ padding: '0.5rem 1rem', borderRadius: '20px', background: getStatusColor(item.status), color: 'white', fontWeight: '600', textTransform: 'capitalize' }}>
+                        {item.status}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="card">
+              <h3 style={{ marginBottom: '1rem' }}>⚠️ Incidents</h3>
+              {incidents.length === 0 ? (
+                <p style={{ color: 'var(--muted)' }}>Aucun incident signalé</p>
+              ) : (
+                incidents.slice(0, 10).map((incident: any, idx: number) => (
+                  <div key={idx} style={{ padding: '1rem 0', borderBottom: '1px solid var(--border)' }}>
+                    <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{incident.type}</p>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                      {incident.location} • {new Date(incident.timestamp).toLocaleTimeString()}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/utilities/electricity.tsx ==========
+import { useState, FormEvent } from 'react';
+import Layout from '../../components/Layout';
+import { payments } from '../../lib/api';
+import { useRouter } from 'next/router';
+
+export default function ElectricityPage() {
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [meterNumber, setMeterNumber] = useState('');
+  const [meterInfo, setMeterInfo] = useState<any>(null);
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('mobile_money');
+  const [result, setResult] = useState<any>(null);
+
+  const checkMeter = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await payments.getMeterInfo(meterNumber);
+      setMeterInfo(data);
+      setStep(2);
+    } catch (err) {
+      alert('Compteur introuvable');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePurchase = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!localStorage.getItem('token')) {
+      router.push('/auth/login');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await payments.purchaseElectricity(meterNumber, parseInt(amount), paymentMethod);
+      setResult(data);
+      setStep(3);
+    } catch (err) {
+      alert('Achat échoué');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>⚡ Acheter de l'électricité</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Achetez vos jetons électriques instantanément
+          </p>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div className="card" style={{ maxWidth: '600px', margin: '0 auto' }}>
+          {step === 1 && (
+            <div>
+              <h2 style={{ marginBottom: '1.5rem' }}>Numéro de compteur</h2>
+              <form onSubmit={checkMeter}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Numéro de compteur
+                  </label>
+                  <input type="text" value={meterNumber} onChange={(e) => setMeterNumber(e.target.value)} placeholder="Entrez votre numéro" required />
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginTop: '0.5rem' }}>
+                    Trouvez-le sur votre compteur ou dernière facture
+                  </p>
+                </div>
+                <button type="submit" disabled={loading} style={{ width: '100%' }}>
+                  {loading ? '⏳ Vérification...' : 'Continuer'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {step === 2 && meterInfo && (
+            <div>
+              <h2 style={{ marginBottom: '1.5rem' }}>Acheter l'électricité</h2>
+              
+              <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                <p><strong>Client:</strong> {meterInfo.customer_name}</p>
+                <p><strong>Compteur:</strong> {meterNumber}</p>
+                <p><strong>Adresse:</strong> {meterInfo.address}</p>
+                <p><strong>Solde:</strong> {meterInfo.balance} BIF</p>
+              </div>
+
+              <form onSubmit={handlePurchase}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Montant (BIF)
+                  </label>
+                  <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant" required min="1000" step="1000" />
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginTop: '0.5rem' }}>
+                    Minimum: 1,000 BIF
+                  </p>
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Mode de paiement
+                  </label>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="card">Carte bancaire</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button type="button" onClick={() => setStep(1)} style={{ flex: 1, background: 'white', color: 'var(--primary)', border: '2px solid var(--primary)' }}>
+                    Retour
+                  </button>
+                  <button type="submit" disabled={loading} style={{ flex: 1 }}>
+                    {loading ? '⏳ Traitement...' : 'Acheter'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {step === 3 && result && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>✅</div>
+              <h2 style={{ marginBottom: '1rem' }}>Achat réussi!</h2>
+              
+              <div style={{ padding: '2rem', background: 'var(--secondary)', borderRadius: '8px', marginBottom: '2rem' }}>
+                <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+                  Votre jeton
+                </p>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)', fontFamily: 'monospace', letterSpacing: '0.1em', marginBottom: '1rem' }}>
+                  {result.token}
+                </p>
+                <p style={{ fontSize: '0.9rem' }}>
+                  Unités: {result.units} kWh
+                </p>
+              </div>
+
+              <div style={{ padding: '1rem', background: '#fff3cd', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left' }}>
+                <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  <strong>📱 Entrez ce jeton sur votre compteur:</strong>
+                </p>
+                <ol style={{ fontSize: '0.9rem', marginLeft: '1.5rem' }}>
+                  <li>Appuyez sur menu</li>
+                  <li>Sélectionnez "Entrer jeton"</li>
+                  <li>Tapez le jeton ci-dessus</li>
+                  <li>Confirmez</li>
+                </ol>
+              </div>
+
+              <button onClick={() => router.push('/dashboard')}>
+                Voir l'historique
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== components/Chatbot.tsx ==========
+import { useState, useRef, useEffect } from 'react';
+import { ai } from '../lib/api';
+
+export default function Chatbot() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMsg = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      const { data } = await ai.chat(input, 'fr', messages);
+      const botMsg = { role: 'assistant', content: data.response };
+      setMessages(prev => [...prev, botMsg]);
+    } catch (err) {
+      console.error('Chat error:', err);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Désolé, erreur de connexion.' }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) {
+    return (
+      <button onClick={() => setIsOpen(true)} style={{
+        position: 'fixed', bottom: '2rem', right: '2rem', width: '60px', height: '60px',
+        borderRadius: '50%', background: 'var(--primary)', color: 'white', fontSize: '1.5rem',
+        border: 'none', boxShadow: 'var(--shadow-lg)', cursor: 'pointer', zIndex: 1000
+      }}>
+        💬
+      </button>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: '2rem', right: '2rem', width: '350px', height: '500px',
+      background: 'white', borderRadius: '12px', boxShadow: 'var(--shadow-lg)',
+      display: 'flex', flexDirection: 'column', zIndex: 1000
+    }}>
+      <div style={{
+        background: 'var(--primary)', color: 'white', padding: '1rem',
+        borderRadius: '12px 12px 0 0', display: 'flex', justifyContent: 'space-between'
+      }}>
+        <h3 style={{ margin: 0 }}>🤖 Assistant IA</h3>
+        <button onClick={() => setIsOpen(false)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.2rem', padding: '0' }}>
+          ×
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+        {messages.length === 0 && (
+          <p style={{ color: 'var(--muted)', textAlign: 'center' }}>
+            Bonjour! Comment puis-je vous aider?
+          </p>
+        )}
+        {messages.map((msg, idx) => (
+          <div key={idx} style={{
+            marginBottom: '1rem', padding: '0.75rem', borderRadius: '8px',
+            background: msg.role === 'user' ? 'var(--primary)' : 'var(--secondary)',
+            color: msg.role === 'user' ? 'white' : 'var(--text)',
+            marginLeft: msg.role === 'user' ? '2rem' : '0',
+            marginRight: msg.role === 'assistant' ? '2rem' : '0'
+          }}>
+            {msg.content}
+          </div>
+        ))}
+        {loading && <p style={{ color: 'var(--muted)' }}>⏳ Réflexion...</p>}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div style={{ padding: '1rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Votre message..."
+            style={{ flex: 1, padding: '0.5rem' }}
+          />
+          <button onClick={sendMessage} disabled={loading} style={{ padding: '0.5rem 1rem' }}>
+            Envoyer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
