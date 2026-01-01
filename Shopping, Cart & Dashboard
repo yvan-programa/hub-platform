@@ -1,0 +1,435 @@
+// ============================================
+// PART 3: SHOPPING, CART & DASHBOARD
+// ============================================
+
+// ========== pages/events/[id].tsx (continued) ==========
+import { useState, useEffect, FormEvent } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { events } from '../../lib/api';
+
+export default function EventDetailPage() {
+  const router = useRouter();
+  const { id } = router.query;
+  const [event, setEvent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [holderInfo, setHolderInfo] = useState({ name: '', email: '' });
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (id) loadEvent();
+  }, [id]);
+
+  const loadEvent = async () => {
+    try {
+      const { data } = await events.getOne(id as string);
+      setEvent(data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBooking = async (e: FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      router.push('/auth/login');
+      return;
+    }
+
+    setBooking(true);
+    try {
+      await events.book(id as string, quantity, holderInfo);
+      setSuccess(true);
+    } catch (err) {
+      alert('Réservation échouée');
+    } finally {
+      setBooking(false);
+    }
+  };
+
+  if (loading) return <Layout><div className="container" style={{ padding: '3rem 0' }}>⏳ Chargement...</div></Layout>;
+  if (!event) return <Layout><div className="container">❌ Événement introuvable</div></Layout>;
+
+  if (success) {
+    return (
+      <Layout>
+        <div className="container" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <div style={{ fontSize: '5rem', marginBottom: '2rem' }}>🎉</div>
+          <h1>Réservation confirmée!</h1>
+          <p style={{ fontSize: '1.2rem', marginTop: '1rem' }}>
+            Vos billets ont été réservés avec succès!
+          </p>
+          <p style={{ color: 'var(--muted)', marginTop: '0.5rem' }}>
+            Consultez votre email pour les détails et codes QR.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem', flexWrap: 'wrap' }}>
+            <button onClick={() => router.push('/dashboard')}>
+              Voir mes billets
+            </button>
+            <button onClick={() => router.push('/events')} style={{ background: 'white', color: 'var(--primary)', border: '2px solid var(--primary)' }}>
+              Plus d'événements
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+          <div>
+            {event.image_url && (
+              <img 
+                src={event.image_url} 
+                alt={event.title}
+                style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px', marginBottom: '2rem' }}
+              />
+            )}
+            
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+              <span style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem 1rem', borderRadius: '20px' }}>
+                {event.category}
+              </span>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '0.5rem 1rem', borderRadius: '20px' }}>
+                {(event.price_cents / 100).toLocaleString()} BIF / billet
+              </span>
+            </div>
+
+            <h1 style={{ marginBottom: '1rem' }}>{event.title}</h1>
+            <p style={{ lineHeight: 1.8, marginBottom: '2rem' }}>{event.description}</p>
+
+            <div>
+              <h3>📋 Détails</h3>
+              <div style={{ marginTop: '1rem' }}>
+                <p style={{ marginBottom: '0.5rem' }}>
+                  <strong>📅 Date:</strong> {new Date(event.start_at).toLocaleDateString('fr-FR', {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}
+                </p>
+                <p style={{ marginBottom: '0.5rem' }}><strong>📍 Lieu:</strong> {event.venue}</p>
+                <p><strong>🎫 Places disponibles:</strong> {event.capacity - event.tickets_sold} / {event.capacity}</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="card" style={{ position: 'sticky', top: '6rem' }}>
+              <h3 style={{ marginBottom: '1.5rem' }}>Réserver</h3>
+              
+              <form onSubmit={handleBooking}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Nombre de billets
+                  </label>
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    min="1"
+                    max={event.capacity - event.tickets_sold}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Nom complet
+                  </label>
+                  <input
+                    type="text"
+                    value={holderInfo.name}
+                    onChange={(e) => setHolderInfo({ ...holderInfo, name: e.target.value })}
+                    placeholder="Jean Dupont"
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={holderInfo.email}
+                    onChange={(e) => setHolderInfo({ ...holderInfo, email: e.target.value })}
+                    placeholder="votre@email.com"
+                    required
+                  />
+                </div>
+
+                <div style={{ padding: '1rem', background: 'var(--secondary)', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span>Billets ({quantity}x)</span>
+                    <span>{((event.price_cents * quantity) / 100).toLocaleString()} BIF</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                    <span>Total</span>
+                    <span>{((event.price_cents * quantity) / 100).toLocaleString()} BIF</span>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={booking || event.capacity - event.tickets_sold === 0} style={{ width: '100%' }}>
+                  {booking ? '⏳ Traitement...' : event.capacity - event.tickets_sold === 0 ? 'Complet' : '🎫 Réserver'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/shopping/index.tsx ==========
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
+import { shopping } from '../../lib/api';
+import Link from 'next/link';
+
+export default function ShoppingPage() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const categories = ['Tout', 'Électronique', 'Mode', 'Alimentation', 'Maison', 'Livres'];
+
+  useEffect(() => {
+    loadProducts();
+  }, [selectedCategory, searchQuery]);
+
+  const loadProducts = async () => {
+    try {
+      const cat = selectedCategory && selectedCategory !== 'Tout' ? selectedCategory : undefined;
+      const { data } = await shopping.getProducts(cat, searchQuery || undefined);
+      setProducts(data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>🛍️ Shopping</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Achetez auprès de vendeurs locaux au Burundi
+          </p>
+          
+          <div style={{ marginTop: '2rem' }}>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher des produits..."
+              style={{ maxWidth: '500px' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => {
+                setSelectedCategory(cat === 'Tout' ? '' : cat);
+                setLoading(true);
+              }}
+              style={{
+                padding: '0.5rem 1.5rem',
+                background: (cat === 'Tout' && !selectedCategory) || selectedCategory === cat ? 'var(--primary)' : 'white',
+                color: (cat === 'Tout' && !selectedCategory) || selectedCategory === cat ? 'white' : 'var(--text)',
+                border: '2px solid var(--primary)',
+                borderRadius: '20px'
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="grid-3">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="card">
+                <div className="skeleton" style={{ height: '200px', marginBottom: '1rem' }} />
+                <div className="skeleton" style={{ height: '24px', marginBottom: '0.5rem' }} />
+                <div className="skeleton" style={{ height: '60px' }} />
+              </div>
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🛍️</div>
+            <h3>Aucun produit trouvé</h3>
+            <p style={{ color: 'var(--muted)' }}>Essayez d'autres filtres</p>
+          </div>
+        ) : (
+          <div className="grid-3">
+            {products.map((product: any) => (
+              <Link href={`/shopping/${product.id}`} key={product.id}>
+                <div className="card" style={{ cursor: 'pointer', height: '100%' }}>
+                  {product.image_url ? (
+                    <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '1rem' }} loading="lazy" />
+                  ) : (
+                    <div style={{ width: '100%', height: '200px', background: 'var(--secondary)', borderRadius: '8px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>
+                      📦
+                    </div>
+                  )}
+                  
+                  <span style={{ background: 'var(--secondary)', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.8rem', display: 'inline-block', marginBottom: '0.5rem' }}>
+                    {product.category}
+                  </span>
+
+                  <h3 style={{ marginBottom: '0.5rem', fontSize: '1.1rem' }}>{product.name}</h3>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {product.description}
+                  </p>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                    <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                      {(product.price_cents / 100).toLocaleString()} BIF
+                    </span>
+                    {product.stock > 0 ? (
+                      <span style={{ fontSize: '0.9rem', color: 'var(--success)' }}>✓ En stock</span>
+                    ) : (
+                      <span style={{ fontSize: '0.9rem', color: 'var(--error)' }}>Rupture</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/shopping/[id].tsx ==========
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { shopping } from '../../lib/api';
+
+export default function ProductDetailPage() {
+  const router = useRouter();
+  const { id } = router.query;
+  const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [quantity, setQuantity] = useState(1);
+
+  useEffect(() => {
+    if (id) loadProduct();
+  }, [id]);
+
+  const loadProduct = async () => {
+    try {
+      const { data } = await shopping.getProduct(id as string);
+      setProduct(data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addToCart = () => {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const existing = cart.find((item: any) => item.product_id === product.id);
+    
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      cart.push({
+        product_id: product.id,
+        name: product.name,
+        price_cents: product.price_cents,
+        quantity,
+        image_url: product.image_url
+      });
+    }
+    
+    localStorage.setItem('cart', JSON.stringify(cart));
+    router.push('/shopping/cart');
+  };
+
+  if (loading) return <Layout><div className="container" style={{ padding: '3rem 0' }}>⏳ Chargement...</div></Layout>;
+  if (!product) return <Layout><div className="container">❌ Produit introuvable</div></Layout>;
+
+  return (
+    <Layout>
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem' }}>
+          <div>
+            {product.image_url ? (
+              <img src={product.image_url} alt={product.name} style={{ width: '100%', borderRadius: '12px', boxShadow: 'var(--shadow)' }} />
+            ) : (
+              <div style={{ width: '100%', height: '400px', background: 'var(--secondary)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>
+                📦
+              </div>
+            )}
+          </div>
+
+          <div>
+            <span style={{ background: 'var(--secondary)', padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.9rem', display: 'inline-block', marginBottom: '1rem' }}>
+              {product.category}
+            </span>
+
+            <h1 style={{ marginBottom: '1rem' }}>{product.name}</h1>
+            
+            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '1.5rem' }}>
+              {(product.price_cents / 100).toLocaleString()} BIF
+            </div>
+
+            <p style={{ lineHeight: 1.8, marginBottom: '2rem', color: 'var(--muted)' }}>
+              {product.description}
+            </p>
+
+            <div style={{ marginBottom: '2rem' }}>
+              {product.stock > 0 ? (
+                <div>
+                  <p style={{ color: 'var(--success)', fontWeight: '500', marginBottom: '1rem' }}>
+                    ✓ En stock ({product.stock} disponibles)
+                  </p>
+                  
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                      Quantité
+                    </label>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: '40px', height: '40px' }}>-</button>
+                      <span style={{ fontSize: '1.2rem', fontWeight: '500' }}>{quantity}</span>
+                      <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} style={{ width: '40px', height: '40px' }}>+</button>
+                    </div>
+                  </div>
+
+                  <button onClick={addToCart} style={{ width: '100%', padding: '1rem' }}>
+                    🛒 Ajouter au panier - {((product.price_cents * quantity) / 100).toLocaleString()} BIF
+                  </button>
+                </div>
+              ) : (
+                <p style={{ color: 'var(--error)', fontWeight: '500' }}>❌ Rupture de stock</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/shopping/cart.tsx ==========
+// [Cart page in next artifact...]
