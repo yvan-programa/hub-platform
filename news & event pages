@@ -1,0 +1,581 @@
+// ============================================
+// PART 2: NEWS & EVENTS PAGES
+// ============================================
+
+// ========== pages/news/index.tsx ==========
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
+import { news } from '../../lib/api';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useT } from '../../lib/i18n';
+
+export default function NewsPage() {
+  const router = useRouter();
+  const tr = useT(router.locale);
+  const [articles, setArticles] = useState<any[]>([]);
+  const [trending, setTrending] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  const categories = ['Tout', 'Politique', 'Économie', 'Sports', 'Culture', 'Technologie'];
+
+  useEffect(() => {
+    loadNews();
+    loadTrending();
+  }, [currentPage, selectedCategory]);
+
+  const loadNews = async () => {
+    try {
+      const cat = selectedCategory && selectedCategory !== 'Tout' ? selectedCategory : undefined;
+      const { data } = await news.getAll(currentPage, cat);
+      setArticles(data.items);
+      setTotalPages(data.pages);
+    } catch (err) {
+      console.error('Error loading news:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTrending = async () => {
+    try {
+      const { data } = await news.getTrending();
+      setTrending(data.slice(0, 5));
+    } catch (err) {
+      console.error('Error loading trending:', err);
+    }
+  };
+
+  const changePage = (newPage: number) => {
+    setCurrentPage(newPage);
+    setLoading(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>📰 Actualités</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Restez informé avec les dernières nouvelles du Burundi
+          </p>
+        </div>
+      </div>
+
+      {/* Category Filter */}
+      <div className="container" style={{ marginTop: '2rem' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          marginBottom: '2rem', 
+          flexWrap: 'wrap',
+          justifyContent: 'center' 
+        }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => {
+                setSelectedCategory(cat === 'Tout' ? '' : cat);
+                setCurrentPage(1);
+                setLoading(true);
+              }}
+              style={{
+                padding: '0.5rem 1.5rem',
+                background: (cat === 'Tout' && !selectedCategory) || selectedCategory === cat 
+                  ? 'var(--primary)' 
+                  : 'white',
+                color: (cat === 'Tout' && !selectedCategory) || selectedCategory === cat
+                  ? 'white' 
+                  : 'var(--text)',
+                border: '2px solid var(--primary)',
+                borderRadius: '20px'
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+          {/* Main Content */}
+          <div>
+            {loading ? (
+              <div>
+                {[1,2,3].map(i => (
+                  <div key={i} className="card" style={{ marginBottom: '1.5rem' }}>
+                    <div className="skeleton" style={{ height: '200px', marginBottom: '1rem' }} />
+                    <div className="skeleton" style={{ height: '24px', marginBottom: '0.5rem' }} />
+                    <div className="skeleton" style={{ height: '60px' }} />
+                  </div>
+                ))}
+              </div>
+            ) : articles.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>📰</p>
+                <h3>Aucun article trouvé</h3>
+                <p style={{ color: 'var(--muted)' }}>Vérifiez plus tard</p>
+              </div>
+            ) : (
+              <>
+                {articles.map((article: any) => (
+                  <Link href={`/news/${article.id}`} key={article.id}>
+                    <div className="card" style={{ marginBottom: '1.5rem', cursor: 'pointer' }}>
+                      {article.image_url && (
+                        <img 
+                          src={article.image_url} 
+                          alt={article.title}
+                          style={{ 
+                            width: '100%', 
+                            height: '200px',
+                            objectFit: 'cover',
+                            borderRadius: '8px', 
+                            marginBottom: '1rem' 
+                          }}
+                          loading="lazy"
+                        />
+                      )}
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '1rem', 
+                        alignItems: 'center', 
+                        marginBottom: '0.5rem',
+                        flexWrap: 'wrap'
+                      }}>
+                        <span style={{
+                          background: 'var(--primary)',
+                          color: 'white',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.8rem'
+                        }}>
+                          {article.category}
+                        </span>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          {new Date(article.created_at).toLocaleDateString('fr-FR')}
+                        </span>
+                        {article.author && (
+                          <span style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                            Par {article.author}
+                          </span>
+                        )}
+                      </div>
+                      <h3 style={{ marginBottom: '0.5rem' }}>{article.title}</h3>
+                      <p style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+                        {article.content.substring(0, 200)}...
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '1rem', 
+                    justifyContent: 'center', 
+                    marginTop: '2rem',
+                    alignItems: 'center'
+                  }}>
+                    <button
+                      onClick={() => changePage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      ← Précédent
+                    </button>
+                    <span style={{ color: 'var(--muted)' }}>
+                      Page {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => changePage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      Suivant →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div>
+            <div className="card" style={{ position: 'sticky', top: '6rem' }}>
+              <h3 style={{ marginBottom: '1.5rem' }}>🔥 Tendances</h3>
+              {trending.length === 0 ? (
+                <p style={{ color: 'var(--muted)' }}>Aucune tendance</p>
+              ) : (
+                trending.map((article: any, idx: number) => (
+                  <Link href={`/news/${article.id}`} key={article.id}>
+                    <div style={{
+                      paddingBottom: '1rem',
+                      marginBottom: '1rem',
+                      borderBottom: idx < trending.length - 1 ? '1px solid var(--border)' : 'none',
+                      cursor: 'pointer'
+                    }}>
+                      <h4 style={{ 
+                        fontSize: '0.95rem', 
+                        marginBottom: '0.5rem',
+                        lineHeight: 1.4 
+                      }}>
+                        {article.title}
+                      </h4>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                        👁️ {article.views} vues
+                      </p>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/news/[id].tsx ==========
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { news } from '../../lib/api';
+import Link from 'next/link';
+
+export default function NewsDetailPage() {
+  const router = useRouter();
+  const { id } = router.query;
+  const [article, setArticle] = useState<any>(null);
+  const [related, setRelated] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) {
+      loadArticle();
+      loadRelated();
+    }
+  }, [id]);
+
+  const loadArticle = async () => {
+    try {
+      const { data } = await news.getOne(id as string);
+      setArticle(data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRelated = async () => {
+    try {
+      const { data } = await news.getTrending();
+      setRelated(data.slice(0, 5));
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  };
+
+  if (loading) return <Layout><div className="container" style={{ padding: '3rem 0' }}>⏳ Chargement...</div></Layout>;
+  if (!article) return <Layout><div className="container">❌ Article introuvable</div></Layout>;
+
+  return (
+    <Layout>
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '3rem' }}>
+          <article>
+            {article.image_url && (
+              <img 
+                src={article.image_url} 
+                alt={article.title}
+                style={{ 
+                  width: '100%', 
+                  borderRadius: '12px',
+                  marginBottom: '2rem',
+                  maxHeight: '400px',
+                  objectFit: 'cover'
+                }}
+              />
+            )}
+
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem', 
+              alignItems: 'center',
+              marginBottom: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <span style={{
+                background: 'var(--primary)',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '20px'
+              }}>
+                {article.category}
+              </span>
+              <span style={{ color: 'var(--muted)' }}>
+                {new Date(article.created_at).toLocaleDateString('fr-FR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </span>
+              {article.author && (
+                <span style={{ color: 'var(--muted)' }}>
+                  Par {article.author}
+                </span>
+              )}
+              <span style={{ color: 'var(--muted)', marginLeft: 'auto' }}>
+                👁️ {article.views} vues
+              </span>
+            </div>
+
+            <h1 style={{ marginBottom: '1.5rem', lineHeight: 1.3 }}>{article.title}</h1>
+
+            <div style={{ 
+              lineHeight: 1.8, 
+              fontSize: '1.05rem',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {article.content}
+            </div>
+
+            {article.tags?.length > 0 && (
+              <div style={{ 
+                marginTop: '3rem',
+                paddingTop: '2rem',
+                borderTop: '2px solid var(--border)'
+              }}>
+                <strong style={{ display: 'block', marginBottom: '1rem' }}>
+                  🏷️ Tags:
+                </strong>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {article.tags.map((tag: string, idx: number) => (
+                    <span 
+                      key={idx}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'var(--secondary)',
+                        borderRadius: '20px',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </article>
+
+          <aside>
+            <div className="card" style={{ position: 'sticky', top: '6rem' }}>
+              <h3 style={{ marginBottom: '1.5rem' }}>📚 Articles connexes</h3>
+              {related.map((rel: any) => (
+                <Link href={`/news/${rel.id}`} key={rel.id}>
+                  <div style={{
+                    paddingBottom: '1rem',
+                    marginBottom: '1rem',
+                    borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer'
+                  }}>
+                    <h4 style={{ 
+                      fontSize: '1rem',
+                      marginBottom: '0.5rem',
+                      lineHeight: 1.4
+                    }}>
+                      {rel.title}
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                      {rel.views} vues • {new Date(rel.created_at).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/events/index.tsx ==========
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
+import { events } from '../../lib/api';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useT } from '../../lib/i18n';
+
+export default function EventsPage() {
+  const router = useRouter();
+  const tr = useT(router.locale);
+  const [eventsList, setEventsList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  const categories = ['Tout', 'Concert', 'Festival', 'Sports', 'Culture', 'Business'];
+
+  useEffect(() => {
+    loadEvents();
+  }, [selectedCategory]);
+
+  const loadEvents = async () => {
+    try {
+      const cat = selectedCategory && selectedCategory !== 'Tout' ? selectedCategory.toLowerCase() : undefined;
+      const { data } = await events.getUpcoming(cat);
+      setEventsList(data);
+    } catch (err) {
+      console.error('Error loading events:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>🎉 Événements</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Réservez vos tickets pour les événements au Burundi
+          </p>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        {/* Category Filter */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          marginBottom: '2rem', 
+          flexWrap: 'wrap',
+          justifyContent: 'center' 
+        }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => {
+                setSelectedCategory(cat === 'Tout' ? '' : cat);
+                setLoading(true);
+              }}
+              style={{
+                padding: '0.5rem 1.5rem',
+                background: (cat === 'Tout' && !selectedCategory) || selectedCategory === cat
+                  ? 'var(--primary)' 
+                  : 'white',
+                color: (cat === 'Tout' && !selectedCategory) || selectedCategory === cat
+                  ? 'white' 
+                  : 'var(--text)',
+                border: '2px solid var(--primary)',
+                borderRadius: '20px'
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="grid-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="card">
+                <div className="skeleton" style={{ height: '200px', marginBottom: '1rem' }} />
+                <div className="skeleton" style={{ height: '24px', marginBottom: '0.5rem' }} />
+                <div className="skeleton" style={{ height: '60px' }} />
+              </div>
+            ))}
+          </div>
+        ) : eventsList.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
+            <h3>Aucun événement trouvé</h3>
+            <p style={{ color: 'var(--muted)' }}>Revenez bientôt!</p>
+          </div>
+        ) : (
+          <div className="grid-3">
+            {eventsList.map((event: any) => (
+              <Link href={`/events/${event.id}`} key={event.id}>
+                <div className="card" style={{ cursor: 'pointer', height: '100%' }}>
+                  {event.image_url ? (
+                    <img 
+                      src={event.image_url} 
+                      alt={event.title}
+                      style={{ 
+                        width: '100%', 
+                        height: '200px', 
+                        objectFit: 'cover', 
+                        borderRadius: '8px',
+                        marginBottom: '1rem'
+                      }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '200px',
+                      background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                      borderRadius: '8px',
+                      marginBottom: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '4rem'
+                    }}>
+                      🎉
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={{
+                      background: 'var(--primary)',
+                      color: 'white',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem'
+                    }}>
+                      {event.category}
+                    </span>
+                    <span style={{
+                      background: 'var(--success)',
+                      color: 'white',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem'
+                    }}>
+                      {(event.price_cents / 100).toLocaleString()} BIF
+                    </span>
+                  </div>
+
+                  <h3 style={{ marginBottom: '0.5rem' }}>{event.title}</h3>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>
+                    📍 {event.venue}
+                  </p>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>
+                    📅 {new Date(event.start_at).toLocaleDateString('fr-FR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long'
+                    })}
+                  </p>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                    🎫 {event.capacity - event.tickets_sold} places disponibles
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/events/[id].tsx ==========
+// [Event detail page continues in next artifact due to length...]
