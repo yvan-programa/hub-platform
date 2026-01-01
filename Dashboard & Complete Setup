@@ -1,0 +1,497 @@
+// ============================================
+// PART 5: DASHBOARD & COMPLETE SETUP
+// ============================================
+
+// ========== pages/dashboard.tsx ==========
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../components/Layout';
+import { events, shopping, payments } from '../lib/api';
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('profile');
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/auth/login');
+      return;
+    }
+
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    setUser(userData);
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [ticketsRes, ordersRes, paymentsRes] = await Promise.all([
+        events.getMyTickets(),
+        shopping.getOrders(),
+        payments.getHistory()
+      ]);
+      
+      setTickets(ticketsRes.data);
+      setOrders(ordersRes.data);
+      setPaymentHistory(paymentsRes.data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const tabs = [
+    { id: 'profile', label: 'Profil', icon: '👤' },
+    { id: 'tickets', label: 'Mes billets', icon: '🎫' },
+    { id: 'orders', label: 'Mes commandes', icon: '📦' },
+    { id: 'payments', label: 'Paiements', icon: '💳' }
+  ];
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>📊 Tableau de bord</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Gérez votre compte et vos activités
+          </p>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          marginBottom: '2rem',
+          borderBottom: '2px solid var(--border)',
+          flexWrap: 'wrap'
+        }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '1rem 1.5rem',
+                background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
+                color: activeTab === tab.id ? 'white' : 'var(--text)',
+                border: 'none',
+                borderBottom: activeTab === tab.id ? '3px solid var(--primary)' : 'none',
+                cursor: 'pointer',
+                fontWeight: activeTab === tab.id ? '600' : '400'
+              }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Profile Tab */}
+        {activeTab === 'profile' && user && (
+          <div className="card">
+            <h2 style={{ marginBottom: '2rem' }}>Informations du profil</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                  Nom complet
+                </label>
+                <p style={{ padding: '0.75rem', background: 'var(--secondary)', borderRadius: '8px' }}>
+                  {user.full_name || 'Non défini'}
+                </p>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                  Email
+                </label>
+                <p style={{ padding: '0.75rem', background: 'var(--secondary)', borderRadius: '8px' }}>
+                  {user.email}
+                </p>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                  Téléphone
+                </label>
+                <p style={{ padding: '0.75rem', background: 'var(--secondary)', borderRadius: '8px' }}>
+                  {user.phone || 'Non défini'}
+                </p>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                  Rôle
+                </label>
+                <p style={{ padding: '0.75rem', background: 'var(--secondary)', borderRadius: '8px', textTransform: 'capitalize' }}>
+                  {user.role}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tickets Tab */}
+        {activeTab === 'tickets' && (
+          <div>
+            {loading ? (
+              <div>
+                {[1,2,3].map(i => (
+                  <div key={i} className="card" style={{ marginBottom: '1rem' }}>
+                    <div className="skeleton" style={{ height: '120px' }} />
+                  </div>
+                ))}
+              </div>
+            ) : tickets.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎫</div>
+                <h3>Aucun billet</h3>
+                <p style={{ color: 'var(--muted)', marginTop: '0.5rem' }}>
+                  Réservez votre premier événement!
+                </p>
+                <button onClick={() => router.push('/events')} style={{ marginTop: '1.5rem' }}>
+                  Parcourir les événements
+                </button>
+              </div>
+            ) : (
+              tickets.map((ticket: any) => (
+                <div key={ticket.id} className="card" style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '2rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ marginBottom: '0.5rem' }}>{ticket.event?.title}</h3>
+                      <p style={{ color: 'var(--muted)', marginBottom: '0.5rem' }}>
+                        📍 {ticket.event?.venue}
+                      </p>
+                      <p style={{ color: 'var(--muted)', marginBottom: '0.5rem' }}>
+                        📅 {new Date(ticket.event?.start_at).toLocaleDateString('fr-FR', {
+                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </p>
+                      <p style={{ marginTop: '0.5rem' }}>
+                        <strong>Titulaire:</strong> {ticket.holder_name}
+                      </p>
+                      {ticket.seat_info && (
+                        <p><strong>Place:</strong> Rangée {ticket.seat_info.row}, Siège {ticket.seat_info.seat}</p>
+                      )}
+                    </div>
+                    {ticket.qr_code && (
+                      <div>
+                        <img src={ticket.qr_code} alt="QR Code" style={{ width: '150px', height: '150px' }} />
+                        <p style={{ textAlign: 'center', fontSize: '0.8rem', color: ticket.checked_in ? 'var(--success)' : 'var(--muted)', marginTop: '0.5rem' }}>
+                          {ticket.checked_in ? '✓ Enregistré' : 'Non enregistré'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Orders Tab */}
+        {activeTab === 'orders' && (
+          <div>
+            {loading ? (
+              <div>
+                {[1,2].map(i => (
+                  <div key={i} className="card" style={{ marginBottom: '1rem' }}>
+                    <div className="skeleton" style={{ height: '150px' }} />
+                  </div>
+                ))}
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📦</div>
+                <h3>Aucune commande</h3>
+                <p style={{ color: 'var(--muted)', marginTop: '0.5rem' }}>
+                  Commencez vos achats!
+                </p>
+                <button onClick={() => router.push('/shopping')} style={{ marginTop: '1.5rem' }}>
+                  Parcourir les produits
+                </button>
+              </div>
+            ) : (
+              orders.map((order: any) => (
+                <div key={order.id} className="card" style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <div>
+                      <h3>Commande #{order.id.slice(0, 8)}</h3>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                        {new Date(order.created_at).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <span style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '20px',
+                      background: 
+                        order.status === 'delivered' ? 'var(--success)' :
+                        order.status === 'shipped' ? '#3b82f6' :
+                        order.status === 'confirmed' ? 'var(--warning)' :
+                        order.status === 'cancelled' ? 'var(--error)' : 'var(--muted)',
+                      color: 'white',
+                      textTransform: 'capitalize',
+                      height: 'fit-content'
+                    }}>
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <strong>Articles:</strong>
+                    <ul style={{ marginTop: '0.5rem', marginLeft: '1.5rem' }}>
+                      {order.items?.map((item: any, idx: number) => (
+                        <li key={idx}>
+                          {item.name} x {item.quantity} - {((item.price_cents * item.quantity) / 100).toLocaleString()} BIF
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {order.delivery_address && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <strong>Adresse de livraison:</strong>
+                      <p style={{ color: 'var(--muted)', marginTop: '0.5rem' }}>
+                        {order.delivery_address.street}, {order.delivery_address.city}, {order.delivery_address.province}
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                    <strong>Total:</strong>
+                    <strong style={{ color: 'var(--primary)' }}>
+                      {(order.total_cents / 100).toLocaleString()} BIF
+                    </strong>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Payments Tab */}
+        {activeTab === 'payments' && (
+          <div>
+            {loading ? (
+              <div>
+                {[1,2,3].map(i => (
+                  <div key={i} className="card" style={{ marginBottom: '1rem' }}>
+                    <div className="skeleton" style={{ height: '80px' }} />
+                  </div>
+                ))}
+              </div>
+            ) : paymentHistory.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💳</div>
+                <h3>Aucun historique</h3>
+                <p style={{ color: 'var(--muted)', marginTop: '0.5rem' }}>
+                  Votre historique de paiements apparaîtra ici
+                </p>
+              </div>
+            ) : (
+              paymentHistory.map((payment: any) => (
+                <div key={payment.id} className="card" style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div>
+                      <h3 style={{ textTransform: 'capitalize', marginBottom: '0.5rem' }}>
+                        {payment.method.replace('_', ' ')}
+                      </h3>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                        {new Date(payment.created_at).toLocaleDateString('fr-FR', {
+                          year: 'numeric', month: 'long', day: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </p>
+                      {payment.order_id && (
+                        <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginTop: '0.5rem' }}>
+                          Commande: #{payment.order_id.slice(0, 8)}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                        {(payment.amount_cents / 100).toLocaleString()} {payment.currency}
+                      </p>
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '12px',
+                        fontSize: '0.9rem',
+                        background: 
+                          payment.status === 'completed' ? 'var(--success)' :
+                          payment.status === 'pending' ? 'var(--warning)' :
+                          payment.status === 'failed' ? 'var(--error)' : 'var(--muted)',
+                        color: 'white',
+                        textTransform: 'capitalize'
+                      }}>
+                        {payment.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+// ========== components/Loading.tsx ==========
+export default function Loading() {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      minHeight: '50vh' 
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{
+          width: '50px',
+          height: '50px',
+          border: '5px solid var(--secondary)',
+          borderTop: '5px solid var(--primary)',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 1rem'
+        }} />
+        <p style={{ color: 'var(--muted)' }}>Chargement...</p>
+      </div>
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ========== components/ErrorBoundary.tsx ==========
+import { Component, ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export default class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ 
+          padding: '3rem', 
+          textAlign: 'center',
+          minHeight: '50vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>⚠️</div>
+          <h2>Quelque chose s'est mal passé</h2>
+          <p style={{ color: 'var(--muted)', marginTop: '0.5rem', marginBottom: '2rem' }}>
+            Une erreur s'est produite. Veuillez rafraîchir la page.
+          </p>
+          <button onClick={() => window.location.reload()}>
+            🔄 Rafraîchir
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// ========== lib/websocket.ts ==========
+import { io, Socket } from 'socket.io-client';
+
+export class TrafficWebSocket {
+  private socket: Socket | null = null;
+
+  connect() {
+    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
+    this.socket = io(WS_URL, {
+      path: '/socket.io',
+      transports: ['websocket']
+    });
+
+    this.socket.on('connect', () => {
+      console.log('WebSocket connected');
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('WebSocket disconnected');
+    });
+
+    return this.socket;
+  }
+
+  subscribeProvince(provinceId: number, callback: (data: any) => void) {
+    if (!this.socket) this.connect();
+    this.socket?.emit('subscribe-province', provinceId);
+    this.socket?.on('traffic-update', callback);
+  }
+
+  unsubscribeProvince(provinceId: number) {
+    if (!this.socket) return;
+    this.socket.emit('unsubscribe-province', provinceId);
+  }
+
+  onIncident(callback: (incident: any) => void) {
+    this.socket?.on('traffic-incident', callback);
+  }
+
+  disconnect() {
+    this.socket?.disconnect();
+    this.socket = null;
+  }
+}
+
+// ========== pages/_document.tsx ==========
+import { Html, Head, Main, NextScript } from 'next/document';
+
+export default function Document() {
+  return (
+    <Html lang="fr">
+      <Head>
+        <meta charSet="utf-8" />
+        <meta name="description" content="Burundi Digital Hub - Services numériques pour le Burundi" />
+        <meta name="theme-color" content="#1e90ff" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </Head>
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  );
+}
+
