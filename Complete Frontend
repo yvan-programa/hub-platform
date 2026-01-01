@@ -1,0 +1,457 @@
+// ========== package.json ==========
+{
+  "name": "burundi-hub-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "export": "next build && next export"
+  },
+  "dependencies": {
+    "next": "^14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "axios": "^1.6.2",
+    "socket.io-client": "^4.6.1",
+    "next-pwa": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.46",
+    "typescript": "^5.3.3"
+  }
+}
+
+// ========== next.config.js ==========
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|svg|gif|webp)$/,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'image-cache',
+        expiration: { maxEntries: 100, maxAgeSeconds: 86400 }
+      }
+    }
+  ]
+});
+
+module.exports = withPWA({
+  reactStrictMode: true,
+  swcMinify: true,
+  i18n: {
+    locales: ['fr', 'en', 'rn'],
+    defaultLocale: 'fr'
+  },
+  images: {
+    domains: ['api.burundihub.bi'],
+    formats: ['image/webp']
+  },
+  compress: true,
+  poweredByHeader: false
+});
+
+// ========== public/manifest.json ==========
+{
+  "name": "Burundi Hub - Digital Platform",
+  "short_name": "Burundi Hub",
+  "description": "Digital services for Burundi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e90ff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ]
+}
+
+// ========== styles/globals.css ==========
+:root {
+  --primary: #1e90ff;
+  --secondary: #f8f9fa;
+  --text: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #ef4444;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s;
+  touch-action: manipulation;
+}
+
+button:active { transform: scale(0.98); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; height: auto; display: block; }
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
+
+@media (max-width: 768px) {
+  .container { padding: 0 0.75rem; }
+  .card { padding: 1rem; }
+  button, input { font-size: 0.95rem; }
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// ========== lib/i18n.ts ==========
+export const t = {
+  fr: {
+    nav: { home: 'Accueil', provinces: 'Provinces', news: 'Actualités', events: 'Événements', 
+           shopping: 'Shopping', traffic: 'Trafic', utilities: 'Services', dashboard: 'Tableau de bord' },
+    common: { loading: 'Chargement...', error: 'Erreur', login: 'Connexion', logout: 'Déconnexion',
+              register: "S'inscrire", search: 'Rechercher', viewAll: 'Voir tout', bookNow: 'Réserver' },
+    home: { hero: 'Bienvenue sur Burundi Hub 🇧🇮', subtitle: 'Votre portail numérique',
+            services: 'Services disponibles', install: 'Installer l\'application' },
+    news: { latest: 'Dernières actualités', trending: 'Tendances', readMore: 'Lire plus' }
+  },
+  en: {
+    nav: { home: 'Home', provinces: 'Provinces', news: 'News', events: 'Events',
+           shopping: 'Shopping', traffic: 'Traffic', utilities: 'Utilities', dashboard: 'Dashboard' },
+    common: { loading: 'Loading...', error: 'Error', login: 'Login', logout: 'Logout',
+              register: 'Register', search: 'Search', viewAll: 'View All', bookNow: 'Book Now' },
+    home: { hero: 'Welcome to Burundi Hub 🇧🇮', subtitle: 'Your digital gateway',
+            services: 'Available Services', install: 'Install App' },
+    news: { latest: 'Latest News', trending: 'Trending', readMore: 'Read More' }
+  },
+  rn: {
+    nav: { home: 'Itangiriro', provinces: 'Intara', news: 'Amakuru', events: 'Ibirori',
+           shopping: 'Kugura', traffic: 'Imihora', utilities: 'Serivisi', dashboard: 'Ikibaho' },
+    common: { loading: 'Gushaka...', error: 'Ikosa', login: 'Injira', logout: 'Sohoka',
+              register: 'Iyandikishe', search: 'Shakisha', viewAll: 'Reba vyose', bookNow: 'Gutumiza' },
+    home: { hero: 'Murakaza neza kuri Burundi Hub 🇧🇮', subtitle: 'Urubuga rwawe',
+            services: 'Serivisi', install: 'Shyiramo app' },
+    news: { latest: 'Amakuru mashya', trending: 'Vy\'ingenzi', readMore: 'Soma byinshi' }
+  }
+};
+
+export const useT = (locale = 'fr') => {
+  return (path: string) => {
+    const keys = path.split('.');
+    let val: any = t[locale as keyof typeof t];
+    for (const k of keys) val = val?.[k];
+    return val || path;
+  };
+};
+
+// ========== lib/api.ts ==========
+import axios from 'axios';
+
+const API = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+  timeout: 10000
+});
+
+if (typeof window !== 'undefined') {
+  const token = localStorage.getItem('token');
+  if (token) API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+}
+
+export const auth = {
+  login: (email: string, password: string) => API.post('/auth/login', { email, password }),
+  register: (data: any) => API.post('/auth/register', data)
+};
+
+export const provinces = {
+  getAll: () => API.get('/provinces'),
+  getOne: (id: number) => API.get(`/provinces/${id}`),
+  getAttractions: (id: number) => API.get(`/provinces/${id}/attractions`)
+};
+
+export const news = {
+  getAll: (page = 1, cat?: string) => API.get(`/news?page=${page}${cat ? `&category=${cat}` : ''}`),
+  getOne: (id: string) => API.get(`/news/${id}`),
+  getTrending: () => API.get('/news/trending')
+};
+
+export const events = {
+  getUpcoming: (cat?: string) => API.get(`/events${cat ? `?category=${cat}` : ''}`),
+  getOne: (id: string) => API.get(`/events/${id}`),
+  book: (id: string, qty: number, holder: any) => API.post(`/events/${id}/book`, { quantity: qty, holder })
+};
+
+export const shopping = {
+  getProducts: (cat?: string, search?: string) => 
+    API.get(`/shopping/products?${cat ? `category=${cat}&` : ''}${search ? `search=${search}` : ''}`),
+  getProduct: (id: string) => API.get(`/shopping/products/${id}`),
+  createOrder: (items: any[], addr: any) => API.post('/shopping/orders', { items, deliveryAddress: addr })
+};
+
+export const traffic = {
+  getLive: (pid?: number) => API.get(`/traffic/live${pid ? `?provinceId=${pid}` : ''}`),
+  getIncidents: () => API.get('/traffic/incidents')
+};
+
+export const payments = {
+  purchaseElectricity: (meter: string, amt: number, method: string) => 
+    API.post('/payments/electricity/purchase', { meterNumber: meter, amount: amt, paymentMethod: method }),
+  getMeterInfo: (meter: string) => API.get(`/payments/electricity/meter/${meter}`)
+};
+
+// ========== components/Layout.tsx ==========
+import { useState, useEffect, ReactNode } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useT } from '../lib/i18n';
+
+export default function Layout({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const tr = useT(router.locale);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setLoggedIn(!!localStorage.getItem('token'));
+  }, []);
+
+  const logout = () => {
+    localStorage.clear();
+    setLoggedIn(false);
+    router.push('/');
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <header style={{ 
+        background: 'var(--primary)', 
+        color: 'white', 
+        padding: '1rem 0',
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 100,
+        boxShadow: 'var(--shadow)'
+      }}>
+        <nav className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Link href="/" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>
+            🇧🇮 Burundi Hub
+          </Link>
+          
+          <button onClick={() => setMenuOpen(!menuOpen)} style={{ 
+            display: 'none',
+            background: 'transparent',
+            fontSize: '1.5rem',
+            padding: '0.5rem'
+          }} className="menu-btn">☰</button>
+
+          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }} className="nav-links">
+            <Link href="/provinces" style={{ color: 'white' }}>{tr('nav.provinces')}</Link>
+            <Link href="/news" style={{ color: 'white' }}>{tr('nav.news')}</Link>
+            <Link href="/events" style={{ color: 'white' }}>{tr('nav.events')}</Link>
+            <Link href="/shopping" style={{ color: 'white' }}>{tr('nav.shopping')}</Link>
+            <Link href="/traffic" style={{ color: 'white' }}>{tr('nav.traffic')}</Link>
+            
+            <select value={router.locale} onChange={e => router.push(router.pathname, router.asPath, { locale: e.target.value })}
+              style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '6px' }}>
+              <option value="fr">FR</option>
+              <option value="en">EN</option>
+              <option value="rn">RN</option>
+            </select>
+
+            {loggedIn ? (
+              <>
+                <Link href="/dashboard" style={{ color: 'white' }}>{tr('nav.dashboard')}</Link>
+                <button onClick={logout} style={{ background: 'white', color: 'var(--primary)', padding: '0.5rem 1rem' }}>
+                  {tr('common.logout')}
+                </button>
+              </>
+            ) : (
+              <Link href="/auth/login">
+                <button style={{ background: 'white', color: 'var(--primary)', padding: '0.5rem 1rem' }}>
+                  {tr('common.login')}
+                </button>
+              </Link>
+            )}
+          </div>
+        </nav>
+      </header>
+
+      <main style={{ flex: 1 }}>{children}</main>
+
+      <footer style={{ background: 'var(--secondary)', padding: '2rem 0', textAlign: 'center', marginTop: '4rem' }}>
+        <p>© 2025 Burundi Hub - Empowering Burundi 🇧🇮</p>
+      </footer>
+
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .nav-links { display: ${menuOpen ? 'flex' : 'none'}; flex-direction: column; position: absolute; 
+                       top: 100%; left: 0; right: 0; background: var(--primary); padding: 1rem; }
+          .menu-btn { display: block !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ========== pages/_app.tsx ==========
+import type { AppProps } from 'next/app';
+import '../styles/globals.css';
+
+export default function App({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />;
+}
+
+// ========== pages/index.tsx ==========
+import Layout from '../components/Layout';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useT } from '../lib/i18n';
+
+export default function Home() {
+  const router = useRouter();
+  const tr = useT(router.locale);
+
+  const services = [
+    { title: 'Traffic', icon: '🚗', link: '/traffic', color: '#f97316' },
+    { title: 'Events', icon: '🎉', link: '/events', color: '#8b5cf6' },
+    { title: 'Shopping', icon: '🛍️', link: '/shopping', color: '#ec4899' },
+    { title: 'Electricity', icon: '⚡', link: '/utilities/electricity', color: '#eab308' },
+    { title: 'News', icon: '📰', link: '/news', color: '#3b82f6' },
+    { title: 'Provinces', icon: '🗺️', link: '/provinces', color: '#22c55e' }
+  ];
+
+  return (
+    <Layout>
+      <div style={{ 
+        padding: '4rem 2rem', 
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, #1e90ff, #0077e6)',
+        color: 'white'
+      }}>
+        <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', marginBottom: '1rem' }}>
+          {tr('home.hero')}
+        </h1>
+        <p style={{ fontSize: 'clamp(1rem, 3vw, 1.3rem)', marginBottom: '2rem', opacity: 0.95 }}>
+          {tr('home.subtitle')}
+        </p>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link href="/provinces"><button>{tr('nav.provinces')}</button></Link>
+          <Link href="/news"><button style={{ background: 'white', color: 'var(--primary)' }}>{tr('nav.news')}</button></Link>
+        </div>
+      </div>
+
+      <div className="container" style={{ margin: '3rem auto' }}>
+        <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>{tr('home.services')}</h2>
+        <div className="grid-3">
+          {services.map((s, i) => (
+            <Link href={s.link} key={i}>
+              <div className="card" style={{ textAlign: 'center', borderTop: `4px solid ${s.color}` }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{s.icon}</div>
+                <h3>{s.title}</h3>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+t, optimized images, skeleton loaders, error handling, offline support
