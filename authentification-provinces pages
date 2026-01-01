@@ -1,0 +1,511 @@
+// ============================================
+// PART 1: AUTHENTICATION & PROVINCE PAGES
+// ============================================
+
+// ========== pages/auth/login.tsx ==========
+import { useState, FormEvent } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { auth } from '../../lib/api';
+import { useT } from '../../lib/i18n';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const tr = useT(router.locale);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const { data } = await auth.login(email, password);
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Update axios headers
+      const axios = (await import('axios')).default;
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
+      
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Login failed. Check credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div style={{ 
+        minHeight: '80vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'var(--secondary)'
+      }}>
+        <div className="card" style={{ maxWidth: '400px', width: '100%', margin: '2rem' }}>
+          <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            {tr('common.login')} - Burundi Hub
+          </h2>
+          
+          {error && (
+            <div style={{ 
+              padding: '1rem', 
+              background: '#fee', 
+              color: '#c33', 
+              borderRadius: '8px', 
+              marginBottom: '1rem',
+              fontSize: '0.9rem'
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="votre@email.com"
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Mot de passe
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+                minLength={8}
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              style={{ width: '100%', padding: '0.75rem' }}
+            >
+              {loading ? '⏳ Connexion...' : '🔐 ' + tr('common.login')}
+            </button>
+
+            <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.95rem' }}>
+              Pas de compte?{' '}
+              <a 
+                href="/auth/register" 
+                style={{ color: 'var(--primary)', fontWeight: '600' }}
+              >
+                S'inscrire ici
+              </a>
+            </p>
+          </form>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/auth/register.tsx ==========
+import { useState, FormEvent } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { auth } from '../../lib/api';
+import { useT } from '../../lib/i18n';
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const tr = useT(router.locale);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data } = await auth.register({
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        fullName: formData.fullName
+      });
+      
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      const axios = (await import('axios')).default;
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
+      
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Inscription échouée. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <Layout>
+      <div style={{ 
+        minHeight: '80vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'var(--secondary)',
+        padding: '2rem 0'
+      }}>
+        <div className="card" style={{ maxWidth: '500px', width: '100%', margin: '0 1rem' }}>
+          <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            Créer un compte
+          </h2>
+          
+          {error && (
+            <div style={{ 
+              padding: '1rem', 
+              background: '#fee', 
+              color: '#c33', 
+              borderRadius: '8px', 
+              marginBottom: '1rem',
+              fontSize: '0.9rem'
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Nom complet
+              </label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => handleChange('fullName', e.target.value)}
+                placeholder="Jean Ndayishimiye"
+                required
+                autoComplete="name"
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+                placeholder="votre@email.com"
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Téléphone
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleChange('phone', e.target.value)}
+                placeholder="+257 XX XXX XXX"
+                required
+                autoComplete="tel"
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Mot de passe
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+              <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.25rem' }}>
+                Minimum 8 caractères
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Confirmer le mot de passe
+              </label>
+              <input
+                type="password"
+                value={formData.confirmPassword}
+                onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              style={{ width: '100%', padding: '0.75rem' }}
+            >
+              {loading ? '⏳ Création...' : '✨ ' + tr('common.register')}
+            </button>
+
+            <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.95rem' }}>
+              Déjà un compte?{' '}
+              <a 
+                href="/auth/login" 
+                style={{ color: 'var(--primary)', fontWeight: '600' }}
+              >
+                Se connecter
+              </a>
+            </p>
+          </form>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/provinces/index.tsx ==========
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
+import { provinces } from '../../lib/api';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useT } from '../../lib/i18n';
+
+export default function ProvincesPage() {
+  const router = useRouter();
+  const tr = useT(router.locale);
+  const [provincesList, setProvincesList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadProvinces();
+  }, []);
+
+  const loadProvinces = async () => {
+    try {
+      const { data } = await provinces.getAll();
+      setProvincesList(data);
+    } catch (err) {
+      setError('Erreur de chargement');
+      console.error('Error loading provinces:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>🗺️ Provinces du Burundi</h1>
+          <p style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+            Explorez les 18 provinces du Burundi
+          </p>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        {loading ? (
+          <div className="grid-3">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="card">
+                <div className="skeleton" style={{ height: '200px', marginBottom: '1rem' }} />
+                <div className="skeleton" style={{ height: '24px', marginBottom: '0.5rem' }} />
+                <div className="skeleton" style={{ height: '60px' }} />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <p style={{ color: 'var(--error)', fontSize: '1.1rem' }}>❌ {error}</p>
+            <button onClick={loadProvinces} style={{ marginTop: '1rem' }}>
+              🔄 Réessayer
+            </button>
+          </div>
+        ) : (
+          <div className="grid-3">
+            {provincesList.map((province: any) => (
+              <Link href={`/provinces/${province.id}`} key={province.id}>
+                <div className="card" style={{ cursor: 'pointer', height: '100%' }}>
+                  <div style={{ 
+                    height: '150px', 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '1rem',
+                    fontSize: '3rem'
+                  }}>
+                    🏞️
+                  </div>
+                  <h3 style={{ marginBottom: '0.5rem' }}>{province.name}</h3>
+                  <p style={{ 
+                    fontSize: '0.9rem', 
+                    color: 'var(--muted)',
+                    marginBottom: '0.5rem' 
+                  }}>
+                    {province.description?.substring(0, 100) || 'Découvrez cette province'}...
+                  </p>
+                  {province.capital && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                      <strong>Chef-lieu:</strong> {province.capital}
+                    </p>
+                  )}
+                  {province.population > 0 && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                      <strong>Population:</strong> {province.population.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+// ========== pages/provinces/[id].tsx ==========
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import { provinces } from '../../lib/api';
+
+export default function ProvinceDetailPage() {
+  const router = useRouter();
+  const { id } = router.query;
+  const [province, setProvince] = useState<any>(null);
+  const [attractions, setAttractions] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) loadData();
+  }, [id]);
+
+  const loadData = async () => {
+    try {
+      const [prov, attr] = await Promise.all([
+        provinces.getOne(Number(id)),
+        provinces.getAttractions(Number(id))
+      ]);
+      setProvince(prov.data);
+      setAttractions(attr.data);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <Layout><div className="container" style={{ padding: '3rem 0' }}>⏳ Chargement...</div></Layout>;
+  if (!province) return <Layout><div className="container">❌ Province introuvable</div></Layout>;
+
+  return (
+    <Layout>
+      <div style={{ background: 'var(--secondary)', padding: '3rem 0' }}>
+        <div className="container">
+          <h1>{province.name}</h1>
+          {province.capital && (
+            <p style={{ fontSize: '1.2rem', marginTop: '0.5rem' }}>
+              Chef-lieu: {province.capital}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: '2rem', marginBottom: '3rem' }}>
+        {province.history && (
+          <div style={{ marginBottom: '3rem' }}>
+            <h2>📜 Histoire</h2>
+            <p style={{ lineHeight: 1.8, marginTop: '1rem' }}>{province.history}</p>
+          </div>
+        )}
+
+        {province.description && (
+          <div style={{ marginBottom: '3rem' }}>
+            <h2>ℹ️ À propos</h2>
+            <p style={{ lineHeight: 1.8, marginTop: '1rem' }}>{province.description}</p>
+          </div>
+        )}
+
+        {attractions?.items?.length > 0 && (
+          <div>
+            <h2>🎯 Attractions</h2>
+            <div className="grid-3" style={{ marginTop: '1rem' }}>
+              {attractions.items.map((item: any, idx: number) => (
+                <div key={idx} className="card">
+                  <h4 style={{ marginBottom: '0.5rem' }}>{item.name}</h4>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                    {item.description}
+                  </p>
+                  {item.category && (
+                    <span style={{
+                      display: 'inline-block',
+                      marginTop: '0.5rem',
+                      padding: '0.25rem 0.75rem',
+                      background: 'var(--primary)',
+                      color: 'white',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem'
+                    }}>
+                      {item.category}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
